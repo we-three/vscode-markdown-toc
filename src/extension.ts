@@ -27,91 +27,163 @@ function markdownTocOptions() {
 	items.push({ label: "3", description: "Include Level 1, 2 and 3 headings" });
   
   vscode.window.showQuickPick(items).then((selection) => {
-    generateToc(parseInt(selection.label, 10));
+    generateToc();
   });
 }
 
-function generateToc(numberOfLevels: number) {
-  new TocGenerator(numberOfLevels).process();
+function generateToc() {
+  new TocGenerator().process();
 }
 
 export class TocGenerator {
+  
+  public minLevel: number = 2;
+  public maxLevel: number = 4;
+  public addNumbering: boolean = true;
+
   private _toc: string = "";
-  constructor(private numberOfLevels: number){}
-  process() {
+  private _tocStartLine: string  = "<!-- vscode-markdown-toc -->";
+  private _tocEndLine: string  = "<!-- /vscode-markdown-toc -->";
+  
+  process(){
+    let headers = new Array<Header>();
+    let tocStartLineNumber : number = 0;
+    let tocEndLineNumber : number = 0;
+    
     let editor = vscode.window.activeTextEditor;
     let doc = editor.document;
     let numLines = doc.lineCount;
+    let levels = new Array<number>(); 
+    
+    for (var index = this.minLevel; index <= this.maxLevel; index++) {
+      levels.push(0);
+    }
+    
     var insideTripleBacktickCodeBlock: boolean = false;
+
     for (var lineNumber = 0; lineNumber < numLines; lineNumber++) {
       let aLine = doc.lineAt(lineNumber);
-      
+
       //Ignore empty lines
       if(aLine.isEmptyOrWhitespace) continue;
       
       //Ignore pre-formatted code blocks in the markdown
       if(aLine.firstNonWhitespaceCharacterIndex > 3) continue;
       
-      let lineText = aLine.text.trim();
+      let lineText = aLine.text.trim();      
+      
+      // Locate if toc was already generated
+      if(lineText.startsWith(this._tocStartLine)){
+        tocStartLineNumber = lineNumber;
+        continue;
+      } else if (lineText.startsWith(this._tocEndLine)) {
+        tocEndLineNumber = lineNumber;
+        continue;
+      }
       
       //If we are within a triple-backtick code blocks, then ignore
       if(lineText.startsWith("```")) {
         if(insideTripleBacktickCodeBlock) continue;
         insideTripleBacktickCodeBlock = !insideTripleBacktickCodeBlock;
-      } 
+      }
+      
       if(lineText.startsWith("#")) {
-        this._processPotentialHeading(lineText);
+        let headerLevel : number = lineText.indexOf(" ");
+          
+        if(headerLevel >= this.minLevel && headerLevel <= this.maxLevel){
+          let level: number = headerLevel - (this.maxLevel - this.minLevel);
+          let previousLevel: number = headers.length > 3 ? headers[headers.length - 2].level : this.maxLevel;
+
+          // Have to reset the sublevels
+          if(level < previousLevel){
+            for (var index = level; index < previousLevel; index++) {
+              levels[index + 1] = 0;
+            }
+          }
+          
+          // increment current level
+          levels[level]++;
+          
+          headers.push(new Header(
+            level, 
+            lineText.substring(headerLevel + 1),
+            copyObject(levels),
+            lineNumber));
+        }
       }
     }
-    this._toc = this._toc.concat("\n\n");
+    
+    var tocSummary = "";
+    tocSummary = tocSummary.concat(this._tocStartLine + "\r\n");
+
+    headers.forEach(header => {
+      let tocLine = "";
+      
+      for(let i = 0; i < header.level; i++){
+        tocLine = tocLine.concat("\t");
+      }
+      tocLine = tocLine.concat("*");
+      
+      if(this.addNumbering){
+        let numbering = " ";
+        let lastLevel = (this.maxLevel - this.minLevel);
+        
+        for (let i = 0; i <= lastLevel; i++){
+          if(header.numbering[i] > 0) {
+            numbering = numbering.concat(header.numbering[i] + ".");
+          }
+        }
+        
+        if(numbering != "") {
+          tocLine = tocLine.concat(numbering);
+        }
+      }
+      
+      tocLine = tocLine.concat(" " + header.title);
+      
+      if(tocLine != null && tocLine != ""){
+        tocSummary = tocSummary.concat(tocLine + "\n");
+      }
+    });
+    tocSummary = tocSummary.concat(this._tocEndLine);
+    
+    console.log(tocSummary);
     editor.edit((editBuilder: vscode.TextEditorEdit)=>{
-      editBuilder.insert(new vscode.Position(0,0), this._toc);
+      editBuilder.replace(new vscode.Range(tocStartLineNumber, 0, tocEndLineNumber, this._tocEndLine.length), tocSummary);
       return Promise.resolve();
     });
+    
     doc.save();
   }
-  
-  private _processPotentialHeading(lineText: string) {
-    let headingSeparatorLocation = lineText.indexOf(" ");
-    //let splitHeading = lineText.split(" ");
-    let headingDenoter = lineText.substr(0, headingSeparatorLocation);
-    if(headingDenoter.length <= this.numberOfLevels) {
-      let significantHeadingText = lineText.substring(headingSeparatorLocation+1);
-      this._toc = this._toc.concat(this._generateTocLine(significantHeadingText, headingDenoter.length));
+}
+
+function copyObject<T> (object:T): T {
+    var objectCopy = <T>{};
+
+    for (var key in object)
+    {
+        if (object.hasOwnProperty(key))
+        {
+            objectCopy[key] = object[key];
+        }
     }
-    
+
+    return objectCopy;
+}
+
+/**
+ * Header
+ */
+class Header {
+  level: number;
+  title: string;
+  numbering: Array<number>;
+  lineNumber: number;
+  
+  constructor(headerLevel:number, title: string, levels: Array<number>, lineNumber: number) {
+    this.level = headerLevel;
+    this.title = title;
+    this.numbering = levels;
+    this.lineNumber = lineNumber;
   }
-  
-  private _generateTocLine(headingText: string, headingLevel: number): string {
-    var tocLine = "\n";
-    for (var i = 1; i < headingLevel; i++) {
-      tocLine = tocLine.concat("  ");
-    }
-    tocLine = tocLine.concat("- [");
-    if(headingLevel === 1){
-      //Make the first level headings appear bold in the TOC
-      tocLine = tocLine.concat("**");
-    }
-    
-    tocLine = tocLine.concat(headingText);
-    if(headingLevel === 1){
-      //Make the first level headings appear bold in the TOC
-      tocLine = tocLine.concat("**");
-    }
-    
-    tocLine = tocLine.concat("](#").concat(this._headingTextToAnchor(headingText)).concat(")");
-    return tocLine;
-  }
-  
-  private _headingTextToAnchor(headingText: string): string {
-    let splitHeading = headingText.split(" ");
-    if(splitHeading.length == 0 || splitHeading.length == 1) return headingText.toLocaleLowerCase();
-    let anchorString = "";
-    for (var index = 0; index < splitHeading.length; index++) {
-      anchorString = anchorString.concat(splitHeading[index].toLocaleLowerCase());
-      if(index != splitHeading.length-1) anchorString = anchorString.concat("-");
-    }
-    return anchorString;
-  }
-  
 }
