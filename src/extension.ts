@@ -13,26 +13,9 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with  registerCommand
 	// The commandId parameter must match the command field in package.json
-	var disposable = vscode.commands.registerCommand('extension.markdownToc', markdownTocOptions);
+	var disposable = vscode.commands.registerCommand('extension.markdownToc', () => {  new TocGenerator().process()});
 	
 	context.subscriptions.push(disposable);
-}
-
-function markdownTocOptions() {
-  var opts: vscode.QuickPickOptions = {matchOnDescription: true, placeHolder: "How many levels of headings do you want to include in the ToC?"}
-  var items: vscode.QuickPickItem[] = [];
-
-	items.push({ label: "1", description: "Only include Level 1 headings" });
-	items.push({ label: "2", description: "Include Level 1 and Level 2 headings" });
-	items.push({ label: "3", description: "Include Level 1, 2 and 3 headings" });
-  
-  vscode.window.showQuickPick(items).then((selection) => {
-    generateToc();
-  });
-}
-
-function generateToc() {
-  new TocGenerator().process();
 }
 
 export class TocGenerator {
@@ -40,6 +23,7 @@ export class TocGenerator {
   public minLevel: number = 2;
   public maxLevel: number = 4;
   public addNumbering: boolean = true;
+  public addAnchor: boolean = true;
 
   private _toc: string = "";
   private _tocStartLine: string  = "<!-- vscode-markdown-toc -->";
@@ -70,7 +54,7 @@ export class TocGenerator {
       //Ignore pre-formatted code blocks in the markdown
       if(aLine.firstNonWhitespaceCharacterIndex > 3) continue;
       
-      let lineText = aLine.text.trim();      
+      let lineText = aLine.text.trim();
       
       // Locate if toc was already generated
       if(lineText.startsWith(this._tocStartLine)){
@@ -93,7 +77,14 @@ export class TocGenerator {
         if(headerLevel >= this.minLevel && headerLevel <= this.maxLevel){
           let level: number = headerLevel - (this.maxLevel - this.minLevel);
           let previousLevel: number = headers.length > 3 ? headers[headers.length - 2].level : this.maxLevel;
-
+          let title: string = lineText.substring(headerLevel + 1);
+          let endAnchor: string = "</a>";
+          
+          // Remove anchor in the title
+          if(title.indexOf(endAnchor) > 0) {
+            title = title.substring(title.indexOf(endAnchor)  + endAnchor.length);
+          }
+          
           // Have to reset the sublevels
           if(level < previousLevel){
             for (var index = level; index < previousLevel; index++) {
@@ -106,9 +97,11 @@ export class TocGenerator {
           
           headers.push(new Header(
             level, 
-            lineText.substring(headerLevel + 1),
+            title,
             copyObject(levels),
-            lineNumber));
+            lineNumber,
+            lineText.length,
+            headers.length));
         }
       }
     }
@@ -125,21 +118,17 @@ export class TocGenerator {
       tocLine = tocLine.concat("*");
       
       if(this.addNumbering){
-        let numbering = " ";
-        let lastLevel = (this.maxLevel - this.minLevel);
-        
-        for (let i = 0; i <= lastLevel; i++){
-          if(header.numbering[i] > 0) {
-            numbering = numbering.concat(header.numbering[i] + ".");
-          }
-        }
-        
+        let numbering = this.buildNumbering(header.numbering);
         if(numbering != "") {
           tocLine = tocLine.concat(numbering);
         }
       }
       
-      tocLine = tocLine.concat(" " + header.title);
+      if(this.addAnchor) {
+        tocLine = tocLine.concat(" [" + header.title+ "](#" + header.anchor +")");
+      } else {
+        tocLine = tocLine.concat(" " + header.title);
+      }
       
       if(tocLine != null && tocLine != ""){
         tocSummary = tocSummary.concat(tocLine + "\n");
@@ -149,13 +138,53 @@ export class TocGenerator {
     
     console.log(tocSummary);
     editor.edit((editBuilder: vscode.TextEditorEdit)=>{
-      editBuilder.replace(new vscode.Range(tocStartLineNumber, 0, tocEndLineNumber, this._tocEndLine.length), tocSummary);
+      headers.forEach(header => {
+        let lineText : string = "";
+        for (var index = 0; index < (header.level + this.maxLevel - this.minLevel); index++) {
+          lineText = lineText.concat('#');
+        }
+        
+        if(this.addNumbering) {
+          lineText = lineText.concat(" " + this.buildNumbering(header.numbering));
+        }
+        
+        lineText = lineText.concat(" ");
+        
+        if(this.addAnchor){
+          lineText = lineText.concat("<a name='" + header.anchor +"'></a>");
+        }
+        
+        lineText = lineText.concat(header.title);
+        editBuilder.replace(new vscode.Range(header.lineNumber, 0, header.lineNumber, header.lineLength), lineText);
+      });
+      
+      if(tocStartLineNumber + tocEndLineNumber == 0){
+        editBuilder.insert(new vscode.Position(0, 0), tocSummary);
+      } else {
+        editBuilder.replace(new vscode.Range(tocStartLineNumber, 0, tocEndLineNumber, this._tocEndLine.length), tocSummary);
+      }
+
+      
       return Promise.resolve();
     });
     
     doc.save();
   }
+  
+  buildNumbering(numberings: Array<number>) : string {
+    let numbering = " ";
+    let lastLevel = (this.maxLevel - this.minLevel);
+    
+    for (let i = 0; i <= lastLevel; i++){
+      if(numberings[i] > 0) {
+        numbering = numbering.concat(numberings[i] + ".");
+      }
+    }
+    
+    return numbering;
+  }
 }
+
 
 function copyObject<T> (object:T): T {
     var objectCopy = <T>{};
@@ -178,12 +207,21 @@ class Header {
   level: number;
   title: string;
   numbering: Array<number>;
+  anchor: string;
   lineNumber: number;
-  
-  constructor(headerLevel:number, title: string, levels: Array<number>, lineNumber: number) {
+  lineLength: number;
+
+  constructor(headerLevel:number, 
+      title: string, 
+      levels: Array<number>, 
+      lineNumber: number, 
+      lineLength: number,
+      index: number) {
     this.level = headerLevel;
     this.title = title;
     this.numbering = levels;
     this.lineNumber = lineNumber;
+    this.lineLength = lineLength;
+    this.anchor = title.replace(/[^a-z0-9\-_:\.]|^[^a-z]+/gi, "") + "-" + index;
   }
 }
