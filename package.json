@@ -2,8 +2,8 @@
 	"name": "markdown-toc",
 	"displayName": "markdown-toc",
 	"description": "Generate Table of Contents for Markdown documents",
-	"version": "0.2.0",
-	"publisher": "curioustechizen",
+	"version": "1.0.0",
+	"publisher": "joffreykern",
 	"engines": {
 		"vscode": "^0.10.1"
 	},
