@@ -134,7 +134,7 @@ export class TocGenerator {
         tocSummary = tocSummary.concat(tocLine + "\n");
       }
     });
-    tocSummary = tocSummary.concat(this._tocEndLine);
+    tocSummary = tocSummary.concat("\n" + this._tocEndLine);
     
     console.log(tocSummary);
     editor.edit((editBuilder: vscode.TextEditorEdit)=>{
