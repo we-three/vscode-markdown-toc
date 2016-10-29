@@ -76,7 +76,7 @@ export class TocGenerator {
           
         if(headerLevel >= this.minLevel && headerLevel <= this.maxLevel){
           let level: number = headerLevel - (this.maxLevel - this.minLevel);
-          let previousLevel: number = headers.length > 3 ? headers[headers.length - 2].level : this.maxLevel;
+          let previousLevel: number = headers.length > 3 ? headers[headers.length - 1].level : this.maxLevel;
           let title: string = lineText.substring(headerLevel + 1);
           let endAnchor: string = "</a>";
           
