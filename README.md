@@ -12,7 +12,6 @@
 
 <!-- /vscode-markdown-toc -->
 
-
 A [Visual Studio Code](https://code.visualstudio.com/) extension that generates a table of contents for your markdown file.
 
 ## <a name='Features-1'></a>Features 
@@ -60,7 +59,6 @@ This plugin is based on the work of [Kiran Rao](https://github.com/curioustechiz
     * enable/disable anchoring
     * enable/disable numbering
     * increase/decrease title's level managed 
-* Update anchoring to be based on something better than ``index in my list``... If you add another title at the top of your document, every titles will be updates.
 * Unit testing
 
 Fell free to submit issues or merge requests ! 
