@@ -180,8 +180,11 @@ export class TocGenerator {
       
       //If we are within a triple-backtick code blocks, then ignore
       if(lineText.startsWith("```")) {
-        if(insideTripleBacktickCodeBlock) continue;
         insideTripleBacktickCodeBlock = !insideTripleBacktickCodeBlock;
+      }
+
+      if(insideTripleBacktickCodeBlock){
+        continue;
       }
       
       if(lineText.startsWith("#")) {
