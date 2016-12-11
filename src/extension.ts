@@ -14,19 +14,16 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with  registerCommand
 	// The commandId parameter must match the command field in package.json
-	var disposable = vscode.commands.registerCommand('extension.markdownToc', () => 
+	var command = vscode.commands.registerCommand('extension.markdownToc', () => 
   {  
     new TocGenerator().process()
   });
 	
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(command);
 }
 
 export class TocGenerator {
-  public minLevel: number = 2;
-  public maxLevel: number = 4;
-  public addNumbering: boolean = true;
-  public addAnchor: boolean = true;
+  private _configuration: TocConfiguration;
 
   private _tocStartLine: string  = "<!-- vscode-markdown-toc -->";
   private _tocEndLine: string  = "<!-- /vscode-markdown-toc -->";
@@ -37,6 +34,8 @@ export class TocGenerator {
   process(){
     let editor = vscode.window.activeTextEditor;
     let doc = editor.document;
+
+    this._configuration = this.readConfiguration(doc);
     let headers : List<Header> = this.buildHeaders(this.buildLineHeaders(doc));
     let tocSummary : string = this.buildSummary(headers);
     console.log(tocSummary);
@@ -44,18 +43,16 @@ export class TocGenerator {
     editor.edit((editBuilder: vscode.TextEditorEdit)=>{
       headers.ForEach(header => {
         let lineText : string = "";
-        for (var index = 0; index < (header.level + this.maxLevel - this.minLevel); index++) {
+        for (var index = 0; index < (header.level + this._configuration.MaxLevel - this._configuration.MinLevel); index++) {
           lineText = lineText.concat('#');
         }
         
-        if(this.addNumbering) {
+        if(this._configuration.Numbering) {
           lineText = lineText.concat(" " + this.buildNumbering(header.numbering));
         }
         
-        lineText = lineText.concat(" ");
-        
-        if(this.addAnchor){
-          lineText = lineText.concat("<a name='" + header.anchor +"'></a>");
+        if(this._configuration.Anchor){
+          lineText = lineText.concat(" <a name='" + header.anchor +"'></a>");
         }
         
         lineText = lineText.concat(header.title);
@@ -71,7 +68,9 @@ export class TocGenerator {
       return Promise.resolve();
     });
     
-    doc.save();
+    if(this._configuration.AutoSave) {
+      doc.save();
+    }
   }
 
   buildSummary(headers : List<Header>) : string {
@@ -85,14 +84,14 @@ export class TocGenerator {
       }
       tocLine = tocLine.concat("*");
       
-      if(this.addNumbering){
+      if(this._configuration.Numbering){
         let numbering = this.buildNumbering(header.numbering);
         if(numbering != "") {
           tocLine = tocLine.concat(numbering);
         }
       }
       
-      if(this.addAnchor) {
+      if(this._configuration.Anchor) {
         tocLine = tocLine.concat(" [" + header.title + "](#" + header.anchor + ")");
       } else {
         tocLine = tocLine.concat(" " + header.title);
@@ -103,6 +102,7 @@ export class TocGenerator {
       }
     });
 
+    tocSummary = tocSummary.concat("\n" + this._configuration.Build());
     tocSummary = tocSummary.concat("\n" + this._tocEndLine);
 
     return tocSummary;
@@ -110,7 +110,7 @@ export class TocGenerator {
   
   buildNumbering(numberings: Array<number>) : string {
     let numbering = " ";
-    let lastLevel = (this.maxLevel - this.minLevel);
+    let lastLevel = (this._configuration.MaxLevel - this._configuration.MinLevel);
     
     for (let i = 0; i <= lastLevel; i++){
       if(numberings[i] > 0) {
@@ -125,20 +125,20 @@ export class TocGenerator {
     let headers : List<Header> = new List<Header>();
     let levels = new Array<number>(); 
 
-    for (var index = this.minLevel; index <= this.maxLevel; index++) {
+    for (var index = this._configuration.MinLevel; index <= this._configuration.MaxLevel; index++) {
       levels.push(0);
     }
 
-    lines.Where(x => x.level >= this.minLevel && x.level <= this.maxLevel).ForEach(header => {
-      header.level = header.level - (this.maxLevel - this.minLevel);      
+    lines.Where(x => x.level >= this._configuration.MinLevel && x.level <= this._configuration.MaxLevel).ForEach(header => {
+      header.level = header.level - (this._configuration.MaxLevel - this._configuration.MinLevel);      
 
-      if(this.addAnchor) {
+      if(this._configuration.Anchor) {
         header.setAnchorUnique(headers.Count(x => x.anchor == header.anchor));
       }
 
-      if(this.addNumbering) {
+      if(this._configuration.Numbering) {
         // Have to reset the sublevels
-        for (var index = header.level; index < this.maxLevel - this.minLevel; index++) {
+        for (var index = header.level; index < this._configuration.MaxLevel - this._configuration.MinLevel; index++) {
           levels[index + 1] = 0;
         }
 
@@ -152,6 +152,31 @@ export class TocGenerator {
     });
 
     return headers;
+  }
+
+  readConfiguration(doc: vscode.TextDocument) : TocConfiguration {
+    let tocConfiguration: TocConfiguration = new TocConfiguration();
+    let readingConfiguration: boolean = false;
+    
+    for (var lineNumber = 0; lineNumber < doc.lineCount; lineNumber++) {
+      let lineText: string = doc.lineAt(lineNumber).text.trim();
+
+      // Break the loop, cause we read the configuration
+      if(lineText.startsWith(tocConfiguration.EndLine)) {
+        break;
+      }
+
+      if(lineText.startsWith(tocConfiguration.StartLine)) {
+        readingConfiguration = true;
+        continue;
+      }
+
+      if(readingConfiguration) {
+        tocConfiguration.Read(lineText);
+      }
+    }
+
+    return tocConfiguration;
   }
 
   buildLineHeaders(doc: vscode.TextDocument) : List<Header> {
@@ -221,6 +246,79 @@ function copyObject<T> (object:T): T {
     }
 
     return objectCopy;
+}
+
+class TocConfiguration {
+  public Numbering: boolean;
+  public Anchor: boolean;
+  public AutoSave: boolean;
+  public MinLevel: number;
+  public MaxLevel: number;
+
+  public StartLine: string = "<!-- vscode-markdown-toc-config";
+  public EndLine: string = "/vscode-markdown-toc-config -->";
+
+  private _numberingKey: string = "numbering=";
+  private _anchorKey: string = "anchor=";
+  private _autoSaveKey: string = "autoSave=";
+  private _minLevelKey: string = "minLevel=";
+  private _maxLevelKey: string = "maxLevel=";
+
+  constructor(numbering: boolean = true,
+    anchor: boolean = true,
+    autoSave: boolean = true,
+    minLevel: number = 2,
+    maxLevel: number = 4) {
+      this.Numbering = numbering;
+      this.Anchor = anchor;
+      this.AutoSave = autoSave;
+      this.MinLevel = minLevel;
+      this.MaxLevel = maxLevel;
+  }
+
+  public Read(lineText: string) {
+    if(this.readable(lineText, this._numberingKey)) {
+      this.Numbering = this.toBoolean(lineText, this._numberingKey);
+    } else if (this.readable(lineText, this._autoSaveKey)) {
+      this.AutoSave = this.toBoolean(lineText, this._autoSaveKey);
+    }
+    // else if (this.readable(lineText, this._anchorKey)) {
+    //   this.Anchor = this.toBoolean(lineText, this._anchorKey);
+    // } else if (this.readable(lineText, this._minLevelKey)) {
+    //   this.MinLevel = this.toNumber(lineText, this._minLevelKey);
+    // } else if (this.readable(lineText, this._maxLevelKey)) {
+    //   this.MaxLevel = this.toNumber(lineText, this._maxLevelKey);
+    // }
+  }
+
+  public Build() : string {
+    let configuration : string = this.StartLine;
+    configuration = configuration.concat("\n\t" + this._numberingKey + this.Numbering);
+    configuration = configuration.concat("\n\t" + this._autoSaveKey + this.AutoSave);
+    // configuration = configuration.concat("\n\t" + this._anchorKey + this.Anchor);
+    // configuration = configuration.concat("\n\t" + this._minLevelKey + this.MinLevel);
+    // configuration = configuration.concat("\n\t" + this._maxLevelKey + this.MaxLevel);
+    configuration = configuration.concat("\n\t" + this.EndLine);
+
+    return configuration;
+  }
+
+  private readable(lineText: string, key:string): boolean {
+    return (lineText.startsWith(key));
+  }
+
+  private toBoolean(lineText: string, key: string) : boolean {
+    lineText = this.extractValue(lineText, key);
+    return (lineText.startsWith("y") || lineText.startsWith("true"));
+  }
+
+  private toNumber(lineText: string, key: string) : number {
+    return Number.parseInt(this.extractValue(lineText, key));
+  }
+
+  private extractValue(lineText: string, key: string) : string {
+    return lineText.substr(key.length, (lineText.length - key.length)).trim().toLowerCase();
+  }
 }
 
 /**
