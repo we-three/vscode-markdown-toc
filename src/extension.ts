@@ -52,7 +52,7 @@ export class TocGenerator {
         }
         
         if(this._configuration.Anchor){
-          lineText = lineText.concat(" <a name='" + header.anchor +"'></a>");
+          lineText = lineText.concat(" <a name='" + header.uniqueAnchor +"'></a>");
         }
         
         lineText = lineText.concat(header.title);
@@ -92,7 +92,7 @@ export class TocGenerator {
       }
       
       if(this._configuration.Anchor) {
-        tocLine = tocLine.concat(" [" + header.title + "](#" + header.anchor + ")");
+        tocLine = tocLine.concat(" [" + header.title + "](#" + header.uniqueAnchor + ")");
       } else {
         tocLine = tocLine.concat(" " + header.title);
       }
@@ -329,6 +329,7 @@ class Header {
   title: string;
   numbering: Array<number>;
   anchor: string;
+  uniqueAnchor: string;
   lineNumber: number;
   lineLength: number;
 
@@ -341,11 +342,12 @@ class Header {
         this.lineNumber = lineNumber;
         this.lineLength = lineLength;
         this.anchor = this.title.replace(/[^a-z0-9\-_:\.]|^[^a-z]+/gi, "");
+        this.uniqueAnchor = this.anchor;
   }
 
   setAnchorUnique(index: number){
     if(index > 0){
-      this.anchor = this.anchor + "-" + index;
+      this.uniqueAnchor = this.anchor + "-" + index;
     }
   }
 }
