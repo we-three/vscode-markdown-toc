@@ -341,7 +341,7 @@ class Header {
         this.title = title;
         this.lineNumber = lineNumber;
         this.lineLength = lineLength;
-        this.anchor = this.title.replace(/[^a-z0-9\-_:\.]|^[^a-z]+/gi, "");
+        this.anchor = this.title.replace(/[^a-z0-9\-_:\.\s]|^[^a-z\s]+/gi, "").replace(/\s/g, "-").toLowerCase();
         this.uniqueAnchor = this.anchor;
   }
 
