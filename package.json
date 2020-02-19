@@ -3,7 +3,7 @@
   "displayName": "Markdown TOC",
   "description": "Generate Table of Contents for Markdown documents",
   "version": "1.5.0",
-  "publisher": "we-three",
+  "publisher": "dumeng",
   "engines": {
     "vscode": "^1.42.0"
   },
@@ -25,16 +25,18 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "yarn run compile",
+    "vscode:prepublish": "yarn compile",
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts",
     "watch": "tsc -watch -p ./",
-    "pretest": "yarn run compile && yarn run lint",
+    "pretest": "yarn  compile && yarn  lint",
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
+    "@types/mocha": "^7.0.1",
     "@types/node": "^13.7.2",
     "@types/vscode": "^1.42.0",
+    "mocha": "^7.0.1",
     "typescript": "^3.7.5"
   },
   "repository": {
