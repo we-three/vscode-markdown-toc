@@ -34,8 +34,8 @@ A [Visual Studio Code](https://code.visualstudio.com/) extension that generates 
 
 - Open any markdown file
 - Open the command palette (`Ctrl+Shift+P`)
-- Type "Generate"
-- Choose "Generate TOC for markdown"
+- Type "generate"
+- Choose "markdownToc: generate"
 
 ## 4. <a name='Configuration'></a>Configuration
 
