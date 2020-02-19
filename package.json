@@ -1,42 +1,47 @@
 {
-    "name": "markdown-toc",
-    "displayName": "Markdown TOC",
-    "description": "Generate Table of Contents for Markdown documents",
-    "version": "1.4.0",
-    "publisher": "joffreykern",
-    "engines": {
-        "vscode": "^0.10.1"
-    },
-    "categories": [
-        "Other"
-    ],
-    "license": "SEE LICENSE.txt",
-    "activationEvents": [
-        "onCommand:extension.markdownToc",
-        "onLanguage:markdown"
-    ],
-    "main": "./out/src/extension",
-    "contributes": {
-        "commands": [
-            {
-                "command": "extension.markdownToc",
-                "title": "Generate TOC for Markdown"
-            }
-        ]
-    },
-    "scripts": {
-        "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-        "compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
-    },
-    "devDependencies": {
-        "typescript": "^1.6.2",
-        "vscode": "0.10.x"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/joffreykern/vscode-markdown-toc.git"
-    },
-    "bugs": {
-        "url": "https://github.com/joffreykern/vscode-markdown-toc/issues"
-    }
+  "name": "markdown-toc",
+  "displayName": "Markdown TOC",
+  "description": "Generate Table of Contents for Markdown documents",
+  "version": "1.5.0",
+  "publisher": "we-three",
+  "engines": {
+    "vscode": "^1.42.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "license": "MIT",
+  "activationEvents": [
+    "onCommand:extension.we-three.markdownToc",
+    "onLanguage:markdown"
+  ],
+  "main": "./out/src/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.we-three.markdownToc",
+        "title": "markdownToc: generate"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint src --ext ts",
+    "watch": "tsc -watch -p ./",
+    "pretest": "yarn run compile && yarn run lint",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^13.7.2",
+    "@types/vscode": "^1.42.0",
+    "typescript": "^3.7.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/we-three/vscode-markdown-toc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/we-three/vscode-markdown-toc/issues"
+  }
 }
